@@ -1,0 +1,9 @@
+services:
+  - type: worker
+    name: telegram-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python "TROJAN BOT FINALE.py"
+    envVars:
+      - key: BOT_TOKEN
+        value: 8149412827:AAFUJP0BU08nZZ0YoEpOuO53r2ttrdNaPiY
