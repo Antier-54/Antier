@@ -20,10 +20,25 @@ ASK_SNIPER_ACTION = 6
 ASK_LIMIT_ORDER_DETAILS = 7
 ASK_WALLET_LABEL = 8
 
+referrals = {}  # user_id -> referrer_id
+referral_stats = {}  # referrer_id -> set of referred user_ids
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    user_id = user.id
     balance_sol = 0
     balance_usd = 0
+
+    # Check for referral code in /start <referral_code>
+    referrer_id = None
+    if context.args:
+        try:
+            referrer_id = int(context.args[0])
+            if referrer_id != user_id and user_id not in referrals:
+                referrals[user_id] = referrer_id
+                referral_stats.setdefault(referrer_id, set()).add(user_id)
+        except Exception:
+            pass  # Ignore invalid referral codes
 
     text = (
         f"Solana · E\n"
@@ -46,7 +61,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Help", callback_data="help"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh")]
     ]
 
-    # Always send a fresh message to maximize keyboard visibility
     if update.message:
         await update.message.reply_text(
             text,
@@ -55,7 +69,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             disable_web_page_preview=True
         )
     else:
-        # For callbacks or when update.message is None, send a new message
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=text,
@@ -63,7 +76,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             disable_web_page_preview=True
         )
-
 async def ask_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask the user for their Solana wallet details."""
     await update.callback_query.answer()
@@ -420,6 +432,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "trenches":
         # Handle Trenches button with Moralis API integration
         ...
+    elif action == "referrals":
+        user_id = update.effective_user.id
+        user_ref_code = str(user_id)
+        referred = referral_stats.get(user_id, set())
+        referred_count = len(referred)
+        referral_text = (
+            f"💰 Invite your friends to save 10% on fees!\n\n"
+            f"Your referral code: {user_ref_code}\n"
+            f"Your referral link: https://t.me/{context.bot.username}?start={user_ref_code}\n\n"
+            f"Users referred: {referred_count}\n"
+            f"{chr(10).join([f'• {uid}' for uid in referred]) if referred else 'No referrals yet.'}\n\n"
+            f"Share your link/code with friends. When they start the bot, you'll see them here!"
+        )
+        keyboard = [
+            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            referral_text,
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
     else:
         # Handle invalid actions
         await query.edit_message_text("❌ Invalid action. Please try again.", parse_mode="Markdown")
@@ -495,274 +529,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return  # Ensure the function exits after handling "trenches"
 
 # Other actions...
-    else:
-        logger.warning(f"Unhandled action: {action}")
-        await query.edit_message_text("❌ Invalid action. Please try again.", parse_mode="Markdown")
-
-    if action == "buy":
-        # Handle Buy button
-        keyboard = [
-            [InlineKeyboardButton("0.5 SOL", callback_data="buy_0.5_sol"), InlineKeyboardButton("1 SOL", callback_data="buy_1_sol")],
-            [InlineKeyboardButton("3 SOL", callback_data="buy_3_sol"), InlineKeyboardButton("5 SOL", callback_data="buy_5_sol")],
-            [InlineKeyboardButton("10 SOL", callback_data="buy_10_sol"), InlineKeyboardButton("20 SOL", callback_data="buy_20_sol")],
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "Select the amount of SOL you want to use for this token:",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-    elif action in ["buy_0.5_sol", "buy_1_sol", "buy_3_sol", "buy_5_sol", "buy_10_sol", "buy_20_sol", "buy_30_sol", "buy_X_sol"]:
-        # Handle specific buy actions
-        keyboard = [
-            [InlineKeyboardButton("Wallet", callback_data="wallet")],
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            f"❌ Insufficient balance to complete the purchase.\n\n"
-            f"Please make a deposit to proceed.",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-    elif action == "wallet":
-        # Redirect to the wallet menu
-        wallet_keyboard = [
-            [InlineKeyboardButton("Import Solana Wallet", callback_data="import_wallet"), InlineKeyboardButton("Delete Wallet", callback_data="delete_wallet")],
-            [InlineKeyboardButton("Label Wallet", callback_data="label_wallet"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh_wallet")],
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(wallet_keyboard)
-        await query.edit_message_text(
-            "🔐 Wallet Options:\n\n"
-            "💳 Solana Wallet Address:\n`6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy`\n"
-            "💳 Label: W1 . ✅\n"
-            "💼 Balance: 0.00 SOL\n\n"
-            "💳 Ethereum Wallet Address:\n`0x5FA54dDe52cc1cCDa8A0a951c47523293c17a970`\n"
-            "💳 Label: W1 . ✅\n"
-            "💼 Balance: 0.00 ETH\n",
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
-    elif action == "positions":
-        # Handle Positions button
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "📊 You currently have no open positions.",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-    elif action == "sell":
-        # Handle Sell button
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "❌ You do not have any tokens to sell at the moment.",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-    elif action == "main_menu":
-        # Redirect to the main menu
-        keyboard = [
-            [InlineKeyboardButton("Buy", callback_data="buy"), InlineKeyboardButton("Sell", callback_data="sell")],
-            [InlineKeyboardButton("Positions", callback_data="positions"), InlineKeyboardButton("Wallet", callback_data="wallet")],
-            [InlineKeyboardButton("DCA Orders", callback_data="dca_orders"), InlineKeyboardButton("Copy Trade", callback_data="copy_trade")],
-            [InlineKeyboardButton("Sniper 🆕", callback_data="sniper"), InlineKeyboardButton("Limit Orders", callback_data="limit_orders"), InlineKeyboardButton("⭐ Watchlist", callback_data="watchlist")],
-            [InlineKeyboardButton("Trenches", callback_data="trenches"), InlineKeyboardButton("💰 Referrals", callback_data="referrals")],
-            [InlineKeyboardButton("Withdraw", callback_data="withdraw"), InlineKeyboardButton("Settings", callback_data="settings")],
-            [InlineKeyboardButton("Help", callback_data="help"), InlineKeyboardButton(" 🔄Refresh", callback_data="refresh")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "Welcome back to the main menu! Select an option below:",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-    elif action == "buy_settings":
-        # Ask for Buy Slippage
-        await query.edit_message_text(
-            "⚙ Buy Settings\n\n"
-            "Please input the slippage percentage for buying (e.g., 0.5 for 0.5%):",
-            parse_mode="Markdown"
-        )
-        return ASK_BUY_SLIPPAGE
-
-    elif action == "sell_settings":
-        # Ask for Sell Slippage
-        await query.edit_message_text(
-            "⚙ Sell Settings\n\n"
-            "Please input the slippage percentage for selling (e.g., 0.5 for 0.5%):",
-            parse_mode="Markdown"
-        )
-        return ASK_SELL_SLIPPAGE
-
-    elif action == "settings":
-        # Handle Settings button (same as /settings command)
-        keyboard = [
-            [InlineKeyboardButton("Buy Settings", callback_data="buy_settings"), InlineKeyboardButton("Sell Settings", callback_data="sell_settings")],
-            [InlineKeyboardButton("Set Referral", callback_data="set_referral"), InlineKeyboardButton("Confirm Trades", callback_data="confirm_trades")],
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "⚙ Settings Menu\n\n"
-            "Select an option below:",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-
-    elif action == "dca_orders":
-        # Handle DCA Orders button
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "📊 DCA Orders\n\n"
-            "You currently have no active DCA orders.",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-    elif action == "copy_trade":
-        # Handle Copy Trade button
-        await query.edit_message_text(
-            "Please provide the address you'd like to copy trades from:",
-            parse_mode="Markdown"
-        )
-        return ASK_COPY_TRADE
-
-    elif action == "sniper":
-        # Handle Sniper button
-        await query.edit_message_text(
-            "Please provide the token address or action you'd like to snipe:",
-            parse_mode="Markdown"
-        )
-        return ASK_SNIPER_ACTION
-
-    elif action == "limit_orders":
-        # Handle Limit Orders button
-        keyboard = [
-            [InlineKeyboardButton("Create Limit Order", callback_data="create_limit_order")],
-            [InlineKeyboardButton("View Active Orders", callback_data="view_active_orders")],
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "📈 Limit Orders Menu\n\n"
-            "Select an option below:",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-
-    elif action == "create_limit_order":
-        # Ask the user to input details for the limit order
-        await query.edit_message_text(
-            "📝 Create Limit Order\n\n"
-            "Please provide the token symbol, price, and amount for the limit order in the following format:\n"
-            "<TOKEN_SYMBOL> <PRICE> <AMOUNT>\n\n"
-            "Example: SOL 25 10 (to buy 10 SOL at $25 each).",
-            parse_mode="Markdown"
-        )
-        return ASK_LIMIT_ORDER_DETAILS
-
-    elif action == "view_active_orders":
-        # Display active limit orders (replace with actual data retrieval logic)
-        active_orders = context.user_data.get("active_orders", [])
-        if not active_orders:
-            await query.edit_message_text(
-                "📋 Active Limit Orders\n\n"
-                "You currently have no active limit orders.",
-                parse_mode="Markdown"
-            )
-        else:
-            orders_text = "\n".join([f"🔹 {order}" for order in active_orders])
-            await query.edit_message_text(
-                f"📋 Active Limit Orders\n\n{orders_text}",
-                parse_mode="Markdown"
-            )
-
-    elif action == "label_wallet":
-        # Handle Label Wallet
-        await query.edit_message_text(
-            "📝 Label Wallet\n\n"
-            "Please provide a label for your wallet (e.g., 'Main Wallet', 'Savings Wallet').",
-            parse_mode="Markdown"
-        )
-        return ASK_WALLET_LABEL
-
-    elif action == "delete_wallet":
-        # Handle Delete Wallet (Dormant)
-        await query.edit_message_text(
-            "❌ Delete Wallet\n\n"
-            "This feature is currently closed.",
-            parse_mode="Markdown"
-        )
-
-    elif action == "refresh_wallet":
-        # Handle Refresh Wallet (Dormant)
-        await query.edit_message_text(
-            "🔄 Refresh Wallet\n\n"
-            "Refreshed.",
-            parse_mode="Markdown"
-        )
-
-    elif action == "withdraw":
-        # Handle Withdraw button (same as /withdraw command)
-        keyboard = [
-            [InlineKeyboardButton("Wallet", callback_data="wallet")],
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "❌ Zero balance.\n\n"
-            "Please deposit funds to proceed.",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-
-    elif action == "help":
-        # Handle Help button (same as /help command)
-        help_text = (
-            "📖 How do I use Trojan?\n"
-            "Check out our [Youtube playlist](https://www.youtube.com/@TrojanOnSolana) where we explain it all and join our support chat for additional resources @trojan.\n\n"
-            "📌 Where can I find my referral code?\n"
-            "Open the /start menu and click 💰Referrals.\n\n"
-            "💰 What are the fees for using Trojan?\n"
-            "Successful transactions through Trojan incur a fee of 0.9%, if you were referred by another user. We don't charge a subscription fee or pay-wall any features.\n\n"
-            "🔒 Security Tips: How can I protect my account from scammers?\n"
-            " - Safeguard does NOT require you to login with a phone number or QR code!\n"
-            " - NEVER search for bots in Telegram. Use only official links.\n"
-            " - Admins and Mods NEVER dm first or send links, stay safe!\n\n"
-            "For an additional layer of security, setup your Secure Action Password (SAP) in the Settings menu. Once set up, you'll use this password to perform any sensitive action like withdrawing funds, exporting your keys, or deleting a wallet. Your SAP is not recoverable once set, please set a hint to facilitate your memory.\n\n"
-            "📊 Trading Tips: Common Failure Reasons\n"
-            " - Slippage Exceeded: Up your slippage or sell in smaller increments.\n"
-            " - Insufficient balance for buy amount + gas: Add SOL or reduce your tx amount.\n"
-            " - Timed out: Can occur with heavy network loads, consider increasing your gas tip.\n\n"
-            "📈 My PNL seems wrong, why is that?\n"
-            "The net profit of a trade takes into consideration the trade's transaction fees. Confirm your gas tip settings and ensure your settings align with your trading size. You can confirm the details of your trade on Solscan.io to verify the net profit.\n\n"
-            "❓ Additional questions or need support?\n"
-            "Join our Telegram group @trojan and one of our admins can assist you."
-        )
-        await query.edit_message_text(
-            help_text,
-            parse_mode="Markdown",
-            disable_web_page_preview=True
-        )
-
-    elif action == "refresh":
-        # Handle Refresh button
-        await query.edit_message_text(
-            "🔄 Your balance and data have been refreshed.",
-            parse_mode="Markdown"
-        )
-
-    # Other actions...
     else:
         logger.warning(f"Unhandled action: {action}")
         await query.edit_message_text("❌ Invalid action. Please try again.", parse_mode="Markdown")
