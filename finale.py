@@ -392,32 +392,6 @@ async def cancel_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Buy process canceled.")
     return ConversationHandler.END
 
-    if action == "referrals":
-        # Handle Referrals button
-        referral_text = (
-            "💰 Invite your friends to save 10% on fees.\n\n"
-            "If you've traded more than $10k volume in a week you'll receive a 35% share of the fees paid by your referees! Otherwise, you'll receive a 25% share.\n\n"
-            "📊 Your Referrals (updated every 30 min)\n"
-            "• Users referred: 0 (direct: 0, indirect: 0)\n"
-            "• Total rewards: 0 SOL ($0.00)\n"
-            "• Total paid: 0 SOL ($0.00)\n"
-            "• Total unpaid: 0 SOL ($0.00)\n\n"
-            "Rewards are paid daily and airdropped directly to your chosen Rewards Wallet. You must have accrued at least 0.005 SOL in unpaid fees to be eligible for a payout.\n\n"
-            "We've established a tiered referral system, ensuring that as more individuals come onboard, rewards extend through five different layers of users. This structure not only benefits community growth but also significantly increases the percentage share of fees for everyone.\n\n"
-            "Stay tuned for more details on how we'll reward active users and happy trading!"
-        )
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Send the referral text
-        await query.message.reply_text(
-            referral_text,
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -425,44 +399,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Action received: {action}")
     logger.info(f"User {query.from_user.id} clicked: {action}")
 
-    # Exclude finalize_import and cancel_import from this handler
-    if action in ["finalize_import", "cancel_import"]:
-        return  # Let the specific handlers handle these actions
-
-    if action == "trenches":
-        # Handle Trenches button with Moralis API integration
-        ...
-    elif action == "referrals":
-        user_id = update.effective_user.id
-        user_ref_code = str(user_id)
-        referred = referral_stats.get(user_id, set())
-        referred_count = len(referred)
-        referral_text = (
-            f"💰 Invite your friends to save 10% on fees!\n\n"
-            f"Your referral code: {user_ref_code}\n"
-            f"Your referral link: https://t.me/{context.bot.username}?start={user_ref_code}\n\n"
-            f"Users referred: {referred_count}\n"
-            f"{chr(10).join([f'• {uid}' for uid in referred]) if referred else 'No referrals yet.'}\n\n"
-            f"Share your link/code with friends. When they start the bot, you'll see them here!"
-        )
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            referral_text,
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-    else:
-        # Handle invalid actions
-        await query.edit_message_text("❌ Invalid action. Please try again.", parse_mode="Markdown")
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    action = query.data  # Ensure this line is present and correctly retrieves the callback data
-    logger.info(f"Action received: {action}")
-    logger.info(f"User {query.from_user.id} clicked: {action}")
+    # Handle import_wallet robustly
+    if action == "import_wallet":
+        await ask_wallet_details(update, context)
+        return
 
     if action == "trenches":
         # Handle Trenches button with Moralis API integration
