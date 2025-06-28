@@ -6,7 +6,7 @@ import os
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(name)
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
@@ -48,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Click on the Refresh button to update your current balance.\n\n"
         f"Join our [Telegram group](https://t.me/trojan) and follow us on [Twitter](https://twitter.com/TrojanOnSolana)!\n\n"
         f"💡 Recommended bots: Agamemnon, Achilles, Odysseus, etc.\n\n"
-        f"⚠ *We have no control over Telegram ads in this bot. If the menu disappears, type /start or /help to bring it back. Please be cautious of fake airdrops and login pages.*"
+        f"⚠ We have no control over Telegram ads in this bot. If the menu disappears, type /start or /help to bring it back. Please be cautious of fake airdrops and login pages."
     )
 
     keyboard = [
