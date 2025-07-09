@@ -429,7 +429,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     for token in data.get("result", [])
                 ]
 
-                message = f"🚀 Latest Graduated Tokens:\n\n{'\n\n'.join(latest_tokens)}" if latest_tokens else "❌ No latest tokens detected."
+                # Fixed f-string with newlines
+                separator = '\n\n'
+                message = f"🚀 Latest Graduated Tokens:\n\n{separator.join(latest_tokens)}" if latest_tokens else "❌ No latest tokens detected."
 
         except Exception as e:
             logger.error(f"Error fetching latest tokens: {e}")
