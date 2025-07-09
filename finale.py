@@ -6,7 +6,7 @@ import os
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(name)
+logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
@@ -870,7 +870,7 @@ async def handle_wallet_label(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
     return ConversationHandler.END
 
-if _name_ == '_main_':
+if __name__ == '_main_':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
