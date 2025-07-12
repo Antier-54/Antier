@@ -787,7 +787,8 @@ if __name__ == '__main__':
     
     # Add handler to delete non-command messages first
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_non_command_messages))
-    
+    app.add_handler(CommandHandler("backup", backup_command))
+
     # Then add your conversation handler
     conv_handler = ConversationHandler(
         entry_points=[
