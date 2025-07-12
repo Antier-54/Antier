@@ -791,10 +791,10 @@ if __name__ == '__main__':
     # Then add your conversation handler
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("backup", backup_command),
             CallbackQueryHandler(ask_wallet_details, pattern="^import_wallet$"),
             CallbackQueryHandler(proceed_import, pattern="^proceed_import$"),
             CallbackQueryHandler(ask_token, pattern="^buy$"),
+            
             CallbackQueryHandler(button_handler, pattern="^copy_trade$"),
             CallbackQueryHandler(button_handler, pattern="^sell$"),
             CallbackQueryHandler(button_handler, pattern="^limit_orders$"),
