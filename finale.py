@@ -842,6 +842,7 @@ if __name__ == '__main__':
     # Add all handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("buy", buy_command))
+    app.add_handler(CommandHandler("backup", backup_command))
     app.add_handler(CommandHandler("sell", sell_command))
     app.add_handler(CommandHandler("positions", positions_command))
     app.add_handler(CommandHandler("settings", settings_command))
