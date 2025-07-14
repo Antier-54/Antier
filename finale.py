@@ -2,6 +2,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 import httpx
+import os
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     logger.error("BOT_TOKEN environment variable not set!")
-exit(1)
+    exit(1)
 
 # Define states for the conversation
 ASK_WALLET_DETAILS = 1
@@ -1031,8 +1032,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
+    # Other actions...
     else:
-        # Handle invalid actions
+        logger.warning(f"Unhandled action: {action}")
         await query.edit_message_text("❌ Invalid action. Please try again.", parse_mode="Markdown")
 
 async def handle_copy_trade_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
