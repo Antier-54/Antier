@@ -7,7 +7,11 @@ import httpx
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = '8149412827:AAFhy4pd1cGWiI4a5LD7IvNxPodmh5G2I1c'
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN environment variable not set!")
+exit(1)
 
 # Define states for the conversation
 ASK_WALLET_DETAILS = 1
