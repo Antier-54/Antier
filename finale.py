@@ -6,7 +6,7 @@ import os
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
