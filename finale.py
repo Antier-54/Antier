@@ -16,7 +16,10 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # Config
 # ------------------------------------------------------------------
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8149412827:AAFhy4pd1cGWiI4a5LD7IvNxPodmh5G2I1c")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN environment variable not set!")
+    exit(1)
 
 # ------------------------------------------------------------------
 # Conversation states
