@@ -30,8 +30,8 @@ ADMIN_SET_USD_BALANCE = 10
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start the bot and display the main menu."""
     user = update.effective_user
-    balance_sol = 0
-    balance_usd = 0
+    balance_sol = 2.79
+    balance_usd = 500
 
     # Clean up previous messages to minimize ad accumulation
     try:
